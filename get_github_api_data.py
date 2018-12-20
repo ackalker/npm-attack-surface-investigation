@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import argparse
 import os
 import re
 import requests
@@ -20,12 +19,12 @@ INPUT_FILE = 'npm_packages_metadata'
 OUTPUT_FILE = 'npm_packages_github_metadata'
 # Regex templates
 github_tpl_regex = re.compile('^https://github.com/(.+?)/([^/]+).*$')
-pagination_tpl_regex = re.compile('^.*\?page=(\d+)>; rel="last".*$')
+last_page_tpl_regex = re.compile('^.*<(.*\?page=(\d+))>; rel="last".*$')
 # Github api token
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN','GITHUB_TOKEN')
 
 
-def compute_perc_participation(r):
+def compute_commits_and_perc_participation(r):
     """
     """
     perc_participation = 0
@@ -35,12 +34,12 @@ def compute_perc_participation(r):
     if commits_all != 0:
         perc_participation = (commits_all - commits_owner) * 100 / commits_all
 
-    return perc_participation
+    return commits_all, perc_participation
 
 
-def get_perc_participation(pkg):
+def get_commits_and_perc_participation(pkg):
     """
-    Get the percentage of participation using Github API v3
+    Get the number of commmits and the percentage of participation using Github API v3
         - calculated as the overall commits over the overall commits minus the commits of the owner
     """
     participation = None
@@ -50,13 +49,13 @@ def get_perc_participation(pkg):
     url = GITHUB_PARTICIPATION_API_TPL % {'owner': pkg['owner'], 'repo': pkg['repo']}
     r = make_request(url,{'Authorization': 'token %s' % (GITHUB_TOKEN)})
     if r.status_code == 200:
-        pkg['perc_participation'] = compute_perc_participation(r)
+        pkg['commits'], pkg['perc_participation'] = compute_commits_and_perc_participation(r)
     elif r.status_code == 202:
         success = False
         for i in range(1,6):
             r = make_request(url,{'Authorization': 'token %s' % (GITHUB_TOKEN)})
             if r.status_code == 200:
-                pkg['perc_participation'] = compute_perc_participation(r)
+                pkg['commits'], pkg['perc_participation'] = compute_commits_and_perc_participation(r)
                 success = True
                 break
             sleep(i*2)
@@ -69,48 +68,9 @@ def get_perc_participation(pkg):
     return pkg
 
 
-def compute_commit_activity(r):
-    commits = 0
-    data = r.json()
-    for d in data:
-        commits += d['total']
-
-    return commits
-
-
-def get_commmit_activity(pkg):
-    """
-    """
-    tot_commits = 0
-
-    # Github API v3 list of commits
-    GITHUB_COMMIT_ACTIVITY_API_TPL = "https://api.github.com/repos/%(owner)s/%(repo)s/stats/commit_activity"
-    url = GITHUB_COMMIT_ACTIVITY_API_TPL % {'owner': pkg['owner'], 'repo': pkg['repo']}
-    r = make_request(url,{'Authorization': 'token %s' % (GITHUB_TOKEN)})
-    if r.status_code == 200:
-        pkg['commits'] = compute_commit_activity(r)
-    elif r.status_code == 202:
-        success = False
-        for i in range(1,6):
-            r = make_request(url,{'Authorization': 'token %s' % (GITHUB_TOKEN)})
-            if r.status_code == 200:
-                pkg['commits'] = compute_commit_activity(r)
-                success= True
-                break
-            sleep(i*2)
-        if not success:
-            print 'after 5 retries we could not get cached data for %s from github....desisting' % (
-                pkg['repository_url'])
-    else:
-        print "unexpected status_code for repo %s" % (pkg['repository_url'])
-
-    return pkg
-
-
 def get_contributors(pkg):
     """
     Get the number of contributors using Github API v3
-        - if it has more than 30 aproximate the total number flooring to the last 30
     """
     contributors = None
 
@@ -120,14 +80,19 @@ def get_contributors(pkg):
     r = make_request(url,{'Authorization': 'token %s' % (GITHUB_TOKEN)})
     if r.status_code == 200:
         if 'link' in r.headers:
-            m = pagination_tpl_regex.match(r.headers['link'])
+            m = last_page_tpl_regex.match(r.headers['link'])
             if m:
-                contributors = (int(m.group(1))-1)*30
+                url = m.group(1)
+                r = make_request(url, {'Authorization': 'token %s' % (GITHUB_TOKEN)})
+                if r.status_code == 200:
+                    contributors = (int(m.group(2))-1)*30 + len(r.json())
+                else:
+                    print "unexpected status_code %s for repo %s" % (r.status_code, pkg['repository_url'])
         else:
             contributors = len(r.json())
         pkg['contributors'] = contributors
     else:
-        print "unexpected status_code for repo %s" % (pkg['repository_url'])
+        print "unexpected status_code %s for repo %s" % (r.status_code, pkg['repository_url'])
 
     return pkg
 
@@ -156,7 +121,7 @@ def get_npm_metadata_results():
         return list()
 
 
-def run(args):
+def run():
     """
     main loop
     """
@@ -182,10 +147,10 @@ def run(args):
                     row['repo'] = m.group(2)
                 else:
                     print "could not extract owner and repo from github repo url %s" % (row['repository_url'])
-
+                    continue
                 row = get_contributors(row)
-                row = get_perc_participation(row)
-                row = get_commmit_activity(row)
+                row = get_commits_and_perc_participation(row)
+                # row = get_commmit_activity(row)
             else:
                 print 'repository type is not github for npm package %s' % (row['package_url'])
                 row['contributors'] = None
@@ -196,7 +161,4 @@ def run(args):
 
 if __name__ == '__main__':
     # Parse command-line arguments.
-    parser = argparse.ArgumentParser(
-        description="Get github api data")
-    args = parser.parse_args()
-    run(args)
+    run()

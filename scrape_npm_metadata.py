@@ -10,10 +10,7 @@ from time import sleep
 import csv
 
 
-DAYS_DELTA = 365
-COMMITS_BOUNDARY = 5
 URL_MOST_DEPENDENT_LIBRARIES = "https://gist.githubusercontent.com/anvaka/8e8fa57c7ee1350e3491/raw/27c81e27e0ebd7331db1fd1ecf14f2179530c083/01.most-dependent-upon.md"
-md_file=""
 HEADER = ["package_name", "package_url", "gist_dependencies", "repository_type",
           "repository_url", "weekly_downloads", "dependents"]
 
@@ -39,12 +36,10 @@ def get_most_dependent_libraries():
         print "could not retrieve libraries from gist"
         raise e
 
-    return md_file
-
 
 def transform_md_file(lines):
     """
-    transform MarkDown file into a list of valid rows and initialize each row with global constants
+    transform markdown file into a list of valid rows and initialize each row with global constants
     """
     data = []
     for line in lines:
