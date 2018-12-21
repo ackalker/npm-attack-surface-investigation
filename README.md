@@ -55,7 +55,7 @@ Make sure the virtualenv is activated, if it is not run `workon npm-attack-surfa
 
 2. Run the script that enriches the previous csv to include github api data using the repository url
 	
-	`$ python get_github_api_data`
+	`$ python get_github_api_data.py`
 
 	The results are stored in `data/npm_packages_github_metadata.csv`
 
