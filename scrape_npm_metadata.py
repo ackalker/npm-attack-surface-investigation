@@ -10,7 +10,7 @@ from time import sleep
 import csv
 
 
-URL_MOST_DEPENDENT_LIBRARIES = "https://gist.githubusercontent.com/anvaka/8e8fa57c7ee1350e3491/raw/27c81e27e0ebd7331db1fd1ecf14f2179530c083/01.most-dependent-upon.md"
+URL_MOST_DEPENDENT_LIBRARIES = "https://gist.githubusercontent.com/anvaka/8e8fa57c7ee1350e3491/raw/01.most-dependent-upon.md"
 HEADER = ["package_name", "package_url", "gist_dependencies", "repository_type",
           "repository_url", "weekly_downloads", "dependents"]
 
